@@ -60,8 +60,8 @@ def _load_session():
     return StringSession()
 
 
-user_client = TelegramClient(_load_session(), API_ID, API_HASH)
-bot = TelegramClient(StringSession(), API_ID, API_HASH)  # сессия бота не нужна на диск
+user_client = TelegramClient(_load_session(), API_ID, API_HASH, loop=loop)
+bot = TelegramClient(StringSession(), API_ID, API_HASH, loop=loop)
 
 state = {"step": "idle", "phone": "", "code": "", "code_hash": None}
 job = {"running": False, "stop": False, "scanned": 0, "new": 0, "seen": 0,
@@ -607,4 +607,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        loop.run_until_complete(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        loop.close()
