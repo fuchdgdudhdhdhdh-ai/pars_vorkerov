@@ -26,6 +26,9 @@ from telethon.tl.functions.messages import (
 )
 from telethon.tl.types import User
 
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("collector")
 
