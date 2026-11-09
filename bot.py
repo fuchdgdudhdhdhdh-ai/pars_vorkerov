@@ -43,7 +43,7 @@ PORT = int(os.getenv("PORT", "8080"))
 SESSION_FILE = os.getenv("SESSION_FILE", "session.txt")
 DB_PATH = os.getenv("DB_PATH", "data.db")
 PAGE_SIZE = 15
-USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{3,31}$")
+USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 
 # ---------------------------------------------------------------- клиенты
 def _load_session():
@@ -52,7 +52,8 @@ def _load_session():
         return StringSession(s)
     if os.path.exists(SESSION_FILE):
         try:
-            raw = open(SESSION_FILE).read().strip()
+            with open(SESSION_FILE, "r", encoding="utf-8") as session_file:
+                raw = session_file.read().strip()
             if raw:
                 return StringSession(raw)
         except Exception:
@@ -155,7 +156,7 @@ def save_session():
             f.write(s)
     except Exception as e:
         log.warning("не сохранил файл сессии: %s", e)
-    log.info("SESSION_STRING=%s", s)
+    log.info("Сессия сохранена.")
 
 
 async def authorized():
@@ -289,6 +290,7 @@ async def do_scrape(chat_id, entity, topic_id, label):
             pass
 
     senders = set()
+    interrupted = False
     try:
         if topic_id:
             try:
@@ -321,9 +323,15 @@ async def do_scrape(chat_id, entity, topic_id, label):
                     senders.add(m.sender_id)
                 await render()
     except FloodWaitError as e:
-        await bot.send_message(chat_id, f"Флуд-лимит {e.seconds} сек — жду и продолжаю")
-        await asyncio.sleep(e.seconds)
+        interrupted = True
+        await bot.send_message(
+            chat_id,
+            f"Telegram ограничил запросы на {e.seconds} сек. "
+            "Текущий обход прерван; уже найденные авторы будут обработаны."
+        )
     except Exception as e:
+        interrupted = True
+        log.exception("Ошибка обхода источника %s", label)
         await bot.send_message(chat_id, f"Ошибка обхода: {e}")
 
     await render(force=True)
@@ -359,8 +367,9 @@ def parse_usernames(raw: str):
     out, seen = [], set()
     for chunk in re.split(r"[\s,;]+", raw):
         u = chunk.strip().lstrip("@")
-        u = re.sub(r"^(?:https?://)?(?:t\.me/|telegram\.me/)", "", u, flags=re.I)
-        if USERNAME_RE.match(u):
+        u = re.sub(r"^(?:https?://)?(?:www\.)?(?:t\.me/|telegram\.me/)", "", u, flags=re.I)
+        u = u.split("?", 1)[0].split("#", 1)[0].strip("/")
+        if USERNAME_RE.fullmatch(u):
             k = u.lower()
             if k not in seen:
                 seen.add(k)
@@ -509,6 +518,8 @@ async def on_text(event):
     if event.sender_id != OWNER_ID or not event.raw_text:
         return
     text = event.raw_text.strip()
+    if text.startswith("/"):
+        return
     step = state["step"]
 
     if step == "await_phone":
