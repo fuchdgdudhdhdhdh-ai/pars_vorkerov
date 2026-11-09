@@ -80,19 +80,22 @@ def now_iso():
 def init_db():
     global conn
 
-    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    db_path = os.path.abspath(DB_PATH)
+    db_dir = os.path.dirname(db_path)
+
     os.makedirs(db_dir, exist_ok=True)
 
     conn = sqlite3.connect(
-        DB_PATH,
+        db_path,
         check_same_thread=False,
         timeout=30
     )
 
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
 
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS collected(
+        CREATE TABLE IF NOT EXISTS collected (
             username TEXT PRIMARY KEY,
             user_id INTEGER,
             source TEXT,
@@ -101,6 +104,8 @@ def init_db():
     """)
 
     conn.commit()
+
+    log.info("База данных подключена: %s", db_path)
 
 
 def add_user(username, user_id, source):
