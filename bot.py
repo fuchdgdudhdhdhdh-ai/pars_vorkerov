@@ -41,7 +41,7 @@ PHONE = os.getenv("PHONE", "").strip()
 
 PORT = int(os.getenv("PORT", "8080"))
 SESSION_FILE = os.getenv("SESSION_FILE", "session.txt")
-DB_PATH = os.getenv("DB_PATH", "data.db")
+DB_PATH = os.getenv("DB_PATH", "/tmp/data.db")
 PAGE_SIZE = 15
 USERNAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_]{4,31}$")
 
@@ -79,14 +79,27 @@ def now_iso():
 
 def init_db():
     global conn
-    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+
+    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    os.makedirs(db_dir, exist_ok=True)
+
+    conn = sqlite3.connect(
+        DB_PATH,
+        check_same_thread=False,
+        timeout=30
+    )
+
     conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("""CREATE TABLE IF NOT EXISTS collected(
-        username TEXT PRIMARY KEY,
-        user_id  INTEGER,
-        source   TEXT,
-        added_at TEXT
-    )""")
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS collected(
+            username TEXT PRIMARY KEY,
+            user_id INTEGER,
+            source TEXT,
+            added_at TEXT
+        )
+    """)
+
     conn.commit()
 
 
